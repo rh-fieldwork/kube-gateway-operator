@@ -33,11 +33,11 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	ocgatev1beta1 "github.com/yaacov/virt-gateway-operator/api/v1beta1"
-	"github.com/yaacov/virt-gateway-operator/pkg/token"
+	ocgatev1beta1 "github.com/rh-fieldwork/virt-gateway-operator/api/v1beta1"
+	"github.com/rh-fieldwork/virt-gateway-operator/pkg/token"
 )
 
-const gatetokenFinalizer = "ocgate.yaacov.com/finalizer"
+const gatetokenFinalizer = "ocgate.rh-fieldwork.com/finalizer"
 
 // GateTokenReconciler reconciles a GateToken object
 type GateTokenReconciler struct {
@@ -51,9 +51,9 @@ type GateTokenReconciler struct {
 // +kubebuilder:rbac:groups="",resources=serviceaccounts,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups="rbac.authorization.k8s.io",resources=clusterroles,verbs=get;list;watch;create;update;patch;delete;deletecollection
 // +kubebuilder:rbac:groups="rbac.authorization.k8s.io",resources=clusterrolebindings,verbs=get;list;watch;create;update;patch;delete;deletecollection
-// +kubebuilder:rbac:groups="ocgate.yaacov.com",resources=gatetokens,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups="ocgate.yaacov.com",resources=gatetokens/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups="ocgate.yaacov.com",resources=gatetokens/finalizers,verbs=update
+// +kubebuilder:rbac:groups="ocgate.rh-fieldwork.com",resources=gatetokens,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups="ocgate.rh-fieldwork.com",resources=gatetokens/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups="ocgate.rh-fieldwork.com",resources=gatetokens/finalizers,verbs=update
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.

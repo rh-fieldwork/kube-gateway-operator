@@ -108,11 +108,11 @@ type GateServerSpec struct {
 	PassThrough bool `json:"passThrough,omitempty"`
 
 	// image is the oc gate proxy image to use.
-	// Defalut value is "quay.io/yaacov/kube-gateway".
+	// Defalut value is "quay.io/rh-fieldwork/kube-gateway".
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:validation:Type="string"
 	// +kubebuilder:validation:MaxLength=1024
-	// +kubebuilder:default:="quay.io/yaacov/kube-gateway"
+	// +kubebuilder:default:="quay.io/rh-fieldwork/kube-gateway"
 	Image string `json:"image,omitempty"`
 
 	// webAppImage is the oc gate proxy web application image to use,
@@ -121,11 +121,11 @@ type GateServerSpec struct {
 	// The static web application should be in the directory "/data/web/public/"
 	// and it will be copied to the proxy servers "/web/public/" directory on pproxy
 	// startup. If left empty, the proxies default web application will not be replaced.
-	// Defalut value is "quay.io/yaacov/kube-gateway-web-app-novnc".
+	// Defalut value is "quay.io/rh-fieldwork/kube-gateway-web-app-novnc".
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:validation:Type="string"
 	// +kubebuilder:validation:MaxLength=1024
-	// +kubebuilder:default:="quay.io/yaacov/kube-gateway-web-app-novnc"
+	// +kubebuilder:default:="quay.io/rh-fieldwork/kube-gateway-web-app-novnc"
 	WebAppImage string `json:"webAppImage,omitempty"`
 
 	// generateSecret determain if a secrete with public and private keys will be automatically

@@ -11,9 +11,9 @@ metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.4.1
   creationTimestamp: null
-  name: gateservers.ocgate.yaacov.com
+  name: gateservers.ocgate.rh-fieldwork.com
 spec:
-  group: ocgate.yaacov.com
+  group: ocgate.rh-fieldwork.com
   names:
     kind: GateServer
     listKind: GateServerList
@@ -56,8 +56,8 @@ spec:
                 description: generateSecret determain if a secrete with public and private keys will be automatically generated when the kube-gateway server is created. Defalut value is true.
                 type: boolean
               image:
-                default: quay.io/yaacov/kube-gateway
-                description: image is the oc gate proxy image to use. Defalut value is "quay.io/yaacov/kube-gateway".
+                default: quay.io/rh-fieldwork/kube-gateway
+                description: image is the oc gate proxy image to use. Defalut value is "quay.io/rh-fieldwork/kube-gateway".
                 maxLength: 1024
                 type: string
               passThrough:
@@ -106,8 +106,8 @@ spec:
                   type: string
                 type: array
               webAppImage:
-                default: quay.io/yaacov/kube-gateway-web-app-novnc
-                description: webAppImage is the oc gate proxy web application image to use, It's an image including the static web application to be served together with k8s API. The static web application should be in the directory "/data/web/public/" and it will be copied to the proxy servers "/web/public/" directory on pproxy startup. If left empty, the proxies default web application will not be replaced. Defalut value is "quay.io/yaacov/kube-gateway-web-app-novnc".
+                default: quay.io/rh-fieldwork/kube-gateway-web-app-novnc
+                description: webAppImage is the oc gate proxy web application image to use, It's an image including the static web application to be served together with k8s API. The static web application should be in the directory "/data/web/public/" and it will be copied to the proxy servers "/web/public/" directory on pproxy startup. If left empty, the proxies default web application will not be replaced. Defalut value is "quay.io/rh-fieldwork/kube-gateway-web-app-novnc".
                 maxLength: 1024
                 type: string
             type: object
@@ -183,9 +183,9 @@ metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.4.1
   creationTimestamp: null
-  name: gatetokens.ocgate.yaacov.com
+  name: gatetokens.ocgate.rh-fieldwork.com
 spec:
-  group: ocgate.yaacov.com
+  group: ocgate.rh-fieldwork.com
   names:
     kind: GateToken
     listKind: GateTokenList
@@ -498,7 +498,7 @@ rules:
   - update
   - watch
 - apiGroups:
-  - ocgate.yaacov.com
+  - ocgate.rh-fieldwork.com
   resources:
   - gateservers
   verbs:
@@ -510,13 +510,13 @@ rules:
   - update
   - watch
 - apiGroups:
-  - ocgate.yaacov.com
+  - ocgate.rh-fieldwork.com
   resources:
   - gateservers/finalizers
   verbs:
   - update
 - apiGroups:
-  - ocgate.yaacov.com
+  - ocgate.rh-fieldwork.com
   resources:
   - gateservers/status
   verbs:
@@ -524,7 +524,7 @@ rules:
   - patch
   - update
 - apiGroups:
-  - ocgate.yaacov.com
+  - ocgate.rh-fieldwork.com
   resources:
   - gatetokens
   verbs:
@@ -536,13 +536,13 @@ rules:
   - update
   - watch
 - apiGroups:
-  - ocgate.yaacov.com
+  - ocgate.rh-fieldwork.com
   resources:
   - gatetokens/finalizers
   verbs:
   - update
 - apiGroups:
-  - ocgate.yaacov.com
+  - ocgate.rh-fieldwork.com
   resources:
   - gatetokens/status
   verbs:
@@ -708,7 +708,7 @@ data:
       port: 9443
     leaderElection:
       leaderElect: true
-      resourceName: cce4a833.yaacov.com
+      resourceName: cce4a833.rh-fieldwork.com
 kind: ConfigMap
 metadata:
   name: virt-gateway-operator-manager-config
@@ -763,7 +763,7 @@ spec:
         - --leader-elect
         command:
         - /manager
-        image: quay.io/yaacov/virt-gateway-operator:latest
+        image: quay.io/rh-fieldwork/virt-gateway-operator:latest
         livenessProbe:
           httpGet:
             path: /healthz

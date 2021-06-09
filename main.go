@@ -34,8 +34,8 @@ import (
 	oauthv1 "github.com/openshift/api/oauth/v1"
 	routev1 "github.com/openshift/api/route/v1"
 
-	ocgatev1beta1 "github.com/yaacov/virt-gateway-operator/api/v1beta1"
-	"github.com/yaacov/virt-gateway-operator/controllers"
+	ocgatev1beta1 "github.com/rh-fieldwork/virt-gateway-operator/api/v1beta1"
+	"github.com/rh-fieldwork/virt-gateway-operator/controllers"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -77,7 +77,7 @@ func main() {
 		Port:                   9443,
 		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         enableLeaderElection,
-		LeaderElectionID:       "cce4a833.yaacov.com",
+		LeaderElectionID:       "cce4a833.rh-fieldwork.com",
 	})
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")
