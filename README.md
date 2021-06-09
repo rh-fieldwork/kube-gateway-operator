@@ -1,12 +1,12 @@
 # kube-gateway-operator
 
-[![Go Report Card](https://goreportcard.com/badge/github.com/yaacov/kube-gateway-operator)](https://goreportcard.com/report/github.com/yaacov/kube-gateway-operator)
-[![Go Reference](https://pkg.go.dev/badge/github.com/yaacov/kube-gateway-operator.svg)](https://pkg.go.dev/github.com/yaacov/kube-gateway-operator)
+[![Go Report Card](https://goreportcard.com/badge/github.com/rh-fieldwork/kube-gateway-operator)](https://goreportcard.com/report/github.com/rh-fieldwork/kube-gateway-operator)
+[![Go Reference](https://pkg.go.dev/badge/github.com/rh-fieldwork/kube-gateway-operator.svg)](https://pkg.go.dev/github.com/rh-fieldwork/kube-gateway-operator)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
-![alt gopher network](https://raw.githubusercontent.com/yaacov/kube-gateway/main/web/public/network-side.png)
+![alt gopher network](https://raw.githubusercontent.com/rh-fieldwork/kube-gateway/main/web/public/network-side.png)
 
-The kube-gateway-operator operates the [kube-gateway](https://github.com/yaacov/kube-gateway) service and access tokens on a cluster.
+The kube-gateway-operator operates the [kube-gateway](https://github.com/rh-fieldwork/kube-gateway) service and access tokens on a cluster.
 
 The kube-gateway service allows non-k8s users access to a single k8s resource for a limited time.
 It uses signed, limited duration [JWT](https://jwt.io/) to grant non-k8s users access to the cluster via a proxy server.
@@ -21,7 +21,7 @@ Once installed, the operator manages two custom resources:
 ``` bash
 # Deploy the gate operator
 kubectl create -f \
-    https://raw.githubusercontent.com/yaacov/kube-gateway-operator/main/deploy/virt-gateway-operator.yaml
+    https://raw.githubusercontent.com/rh-fieldwork/kube-gateway-operator/main/deploy/virt-gateway-operator.yaml
 ```
 
 ### Deploy a gate server
@@ -31,7 +31,7 @@ kubectl create -f \
 kubectl create namespace kube-gateway
 
 # Download the kube-gateway-server example
-curl https://raw.githubusercontent.com/yaacov/kube-gateway-operator/main/deploy/virt-gateway-server.yaml \
+curl https://raw.githubusercontent.com/rh-fieldwork/kube-gateway-operator/main/deploy/virt-gateway-server.yaml \
     -o kube-gateway-server.yaml
 
 # Customize and deploy the kube-gateway-server example
@@ -44,7 +44,7 @@ kubectl create -f kube-gateway-server.yaml
 This example will generate a token that will give its holder access to API calls matching the path `/k8s/apis/subresources.kubevirt.io/v1alpha3/namespaces/default/virtualmachineinstances/testvm/vnc` for one hour. You can edit the route to match the route designated for the gate server on your cluster.
 
 ```yaml
-apiVersion: ocgate.yaacov.com/v1beta1
+apiVersion: ocgate.rh-fieldwork.com/v1beta1
 kind: GateToken
 metadata:
   name: gatetoken-sample
@@ -60,7 +60,7 @@ spec:
 A single gate server can handle requests for resources from different users and across different namespaces.
 
 ```yaml
-apiVersion: ocgate.yaacov.com/v1beta1
+apiVersion: ocgate.rh-fieldwork.com/v1beta1
 kind: GateServer
 metadata:
   name: gateserver-sample
@@ -85,11 +85,11 @@ spec:
   # authenticating and replaces it with the service account access token of the proxy
   passThrough: false
   # the proxy server container image
-  image: 'quay.io/yaacov/kube-gateway'
+  image: 'quay.io/rh-fieldwork/kube-gateway'
   # webAppImage is used to customize the static files of your web app.
   # This example will install the noVNC web application that consumes
   # websockets streaming VNC data.
-  webAppImage: 'quay.io/yaacov/kube-gateway-web-app-novnc'
+  webAppImage: 'quay.io/rh-fieldwork/kube-gateway-web-app-novnc'
 ```
 
 Credit: gopher network image created by Egon Elbre and can be found at [egonelbre/gophers](https://github.com/egonelbre/gophers)

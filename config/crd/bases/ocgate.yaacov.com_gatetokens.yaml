@@ -6,9 +6,9 @@ metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.4.1
   creationTimestamp: null
-  name: gatetokens.ocgate.yaacov.com
+  name: gatetokens.ocgate.rh-fieldwork.com
 spec:
-  group: ocgate.yaacov.com
+  group: ocgate.rh-fieldwork.com
   names:
     kind: GateToken
     listKind: GateTokenList

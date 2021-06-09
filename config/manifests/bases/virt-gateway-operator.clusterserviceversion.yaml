@@ -6,7 +6,7 @@ metadata:
     capabilities: Basic Install
     categories: OpenShift Optional
     certified: "false"
-    containerImage: quay.io/yaacov/virt-gateway-operator:v0.0.1
+    containerImage: quay.io/rh-fieldwork/virt-gateway-operator:v0.0.1
   name: virt-gateway-operator.v0.0.0
   namespace: placeholder
 spec:
@@ -16,12 +16,12 @@ spec:
     - description: GateServer is the Schema for the gateservers API
       displayName: Gate Server
       kind: GateServer
-      name: gateservers.ocgate.yaacov.com
+      name: gateservers.ocgate.rh-fieldwork.com
       version: v1beta1
     - description: GateToken is the Schema for the gatetokens API
       displayName: Gate Token
       kind: GateToken
-      name: gatetokens.ocgate.yaacov.com
+      name: gatetokens.ocgate.rh-fieldwork.com
       version: v1beta1
   description: Generate access tokens for oc gate service
   displayName: OC Gate operator
@@ -47,10 +47,10 @@ spec:
   - access
   links:
   - name: Oc Gate Service
-    url: https://github.com/yaacov/kube-gateway
+    url: https://github.com/rh-fieldwork/kube-gateway
   - name: Oc Gate Operator
-    url: https://github.com/yaacov/virt-gateway-operator
+    url: https://github.com/rh-fieldwork/virt-gateway-operator
   maturity: alpha
   provider:
-    name: yaacov.com
+    name: rh-fieldwork.com
   version: 0.0.0

@@ -1,4 +1,4 @@
-apiVersion: ocgate.yaacov.com/v1beta1
+apiVersion: ocgate.rh-fieldwork.com/v1beta1
 kind: GateServer
 metadata:
   name: gateserver-sample
@@ -14,5 +14,5 @@ spec:
     - "virtualmachineinstances"
   generateSecret: true
   passThrough: false
-  image: "quay.io/yaacov/kube-gateway"
-  webAppImage: "quay.io/yaacov/kube-gateway-web-app-novnc"
+  image: "quay.io/rh-fieldwork/kube-gateway"
+  webAppImage: "quay.io/rh-fieldwork/kube-gateway-web-app-novnc"

@@ -1,4 +1,4 @@
-apiVersion: ocgate.yaacov.com/v1beta1
+apiVersion: ocgate.rh-fieldwork.com/v1beta1
 kind: GateToken
 metadata:
   name: token-testvm02

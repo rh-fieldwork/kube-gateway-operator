@@ -1,4 +1,4 @@
-module github.com/yaacov/virt-gateway-operator
+module github.com/rh-fieldwork/virt-gateway-operator
 
 go 1.15
 

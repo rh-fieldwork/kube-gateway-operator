@@ -32,10 +32,10 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	ocgatev1beta1 "github.com/yaacov/virt-gateway-operator/api/v1beta1"
+	ocgatev1beta1 "github.com/rh-fieldwork/virt-gateway-operator/api/v1beta1"
 )
 
-const gateserverFinalizer = "ocgate.yaacov.com/finalizer"
+const gateserverFinalizer = "ocgate.rh-fieldwork.com/finalizer"
 
 // GateServerReconciler reconciles a GateServer object
 type GateServerReconciler struct {
@@ -57,9 +57,9 @@ type GateServerReconciler struct {
 // +kubebuilder:rbac:groups="route.openshift.io",resources=routes/custom-host,verbs=create;patch
 // +kubebuilder:rbac:groups="oauth.openshift.io",resources=oauthclients,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups="security.openshift.io",resources=securitycontextconstraints,resourceNames=privileged,verbs=use
-// +kubebuilder:rbac:groups="ocgate.yaacov.com",resources=gateservers,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups="ocgate.yaacov.com",resources=gateservers/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups="ocgate.yaacov.com",resources=gateservers/finalizers,verbs=update
+// +kubebuilder:rbac:groups="ocgate.rh-fieldwork.com",resources=gateservers,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups="ocgate.rh-fieldwork.com",resources=gateservers/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups="ocgate.rh-fieldwork.com",resources=gateservers/finalizers,verbs=update
 
 // In order to grant client users access to resource, the operator it'slef need this access.
 // Note: to create a new gate server with admin role, the role of this operator need to be adjusted.
