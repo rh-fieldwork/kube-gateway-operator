@@ -21,7 +21,7 @@ Once installed, the operator manages two custom resources:
 ``` bash
 # Deploy the gate operator
 kubectl create -f \
-    https://raw.githubusercontent.com/rh-fieldwork/kube-gateway-operator/main/deploy/virt-gateway-operator.yaml
+    https://raw.githubusercontent.com/rh-fieldwork/kube-gateway-operator/main/deploy/kube-gateway-operator.yaml
 ```
 
 ### Deploy a gate server

@@ -20,7 +20,7 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	ocgatev1beta1 "github.com/rh-fieldwork/virt-gateway-operator/api/v1beta1"
+	ocgatev1beta1 "github.com/rh-fieldwork/kube-gateway-operator/api/v1beta1"
 )
 
 // ClusterRole is a

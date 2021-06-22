@@ -13,7 +13,7 @@ kubectl wait --timeout=180s --for=condition=Available -n kubevirt kv/kubevirt
 ## Deploy operator
 
 ```bash
-IMG=quay.io/rh-fieldwork/virt-gateway-operator make deploy
+IMG=quay.io/rh-fieldwork/kube-gateway-operator make deploy
 
 kubectl wait --timeout=180s --for=condition=Available -n kube-gateway deployments/kube-gateway-server
 

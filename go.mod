@@ -1,4 +1,4 @@
-module github.com/rh-fieldwork/virt-gateway-operator
+module github.com/rh-fieldwork/kube-gateway-operator
 
 go 1.15
 

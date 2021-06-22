@@ -5,9 +5,9 @@ If the system is in a disconnected environment, without access to the public ima
 
 ``` bash
 # Edit the operator image in operator-controller-manager.yaml
-curl https://raw.githubusercontent.com/rh-fieldwork/virt-gateway-operator/main/deploy/virt-gateway-operator.yaml \
-    -o virt-gateway-operator.yaml
+curl https://raw.githubusercontent.com/rh-fieldwork/kube-gateway-operator/main/deploy/kube-gateway-operator.yaml \
+    -o kube-gateway-operator.yaml
 
-vim virt-gateway-operator.yaml
-kubectl create -f virt-gateway-operator.yaml
+vim kube-gateway-operator.yaml
+kubectl create -f kube-gateway-operator.yaml
 ```
