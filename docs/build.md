@@ -1,17 +1,39 @@
 # Build
 
-```bash
-make && make podman-build && make podman-push
+## Log in to your image repository
 
-# Get the image digests hase using podamn CLI:
-# podman image inspect quay.io/rh-fieldwork/kube-gateway-operator | jq .[0].RepoDigests[0]
-IMG=quay.io/rh-fieldwork/kube-gateway-operator@sha256:98de8105eefb10263a52bd2730b3c5fee0b9a21960db34089f56a6dba8eec289 make deploy-dir
+For example, if you are using quay.io:
+
+`podman login quay.io`
+
+Enter your username and password when prompted. Once you are logged in, you can make and push the image.
+
+## Make and push an image
+
+Create your repository.
+
+The following `make` commands will build and push the image to the repository specified by the IMG variable.
+Make sure to update the IMG variable with the URL to the repository in which you want the image to be created, for example:
+
+`IMG=quay.io/rh-fieldwork/kube-gateway-operator`
+
+```bash
+make 
+IMG=quay.io/<username>/kube-gateway-operator make podman-build 
+IMG=quay.io/<username>/kube-gateway-operator make podman-push
 ```
+
+## Create the deployment manifest
+
+The image URL for the command below must include the image's digest hash, which is retrieved using the podman CLI command
+inside the parentheses. Make sure to replace the <username> placeholder.
+
+`IMG=$(podman image inspect quay.io/<username>/kube-gateway-operator | jq '.[0].RepoDigests[0]') make deploy-dir`
 
 ## operator-sdk
 
-```basg
-perator-sdk init --domain rh-fieldwork.com --repo github.com/rh-fieldwork/kube-gateway-operator
+```bash
+operator-sdk init --domain rh-fieldwork.com --repo github.com/rh-fieldwork/kube-gateway-operator
 operator-sdk create api --group oc-gate --version v1alpha1 \
   --kind Token --resource --controller
 
