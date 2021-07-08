@@ -1,7 +1,7 @@
 domain: rh-fieldwork.com
 layout: go.kubebuilder.io/v3
-projectName: virt-gateway-operator
-repo: github.com/rh-fieldwork/virt-gateway-operator
+projectName: kube-gateway-operator
+repo: github.com/rh-fieldwork/kube-gateway-operator
 resources:
 - crdVersion: v1
   group: ocgate

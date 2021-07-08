@@ -34,8 +34,8 @@ import (
 	oauthv1 "github.com/openshift/api/oauth/v1"
 	routev1 "github.com/openshift/api/route/v1"
 
-	ocgatev1beta1 "github.com/rh-fieldwork/virt-gateway-operator/api/v1beta1"
-	"github.com/rh-fieldwork/virt-gateway-operator/controllers"
+	ocgatev1beta1 "github.com/rh-fieldwork/kube-gateway-operator/api/v1beta1"
+	"github.com/rh-fieldwork/kube-gateway-operator/controllers"
 	// +kubebuilder:scaffold:imports
 )
 
