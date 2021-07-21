@@ -130,7 +130,7 @@ func containers(s *ocgatev1beta1.GateServer) []corev1.Container {
 	commandHTTPS := []string{
 		"./kube-gateway",
 		fmt.Sprintf("-api-server=%s", s.Spec.APIURL),
-		"-ca-file=/var/run/secrets/kubernetes.io/serviceaccount/service-ca.crt",
+		"-ca-file=/var/run/secrets/kubernetes.io/serviceaccount/ca.crt",
 		"-cert-file=/secrets/tls.crt",
 		"-key-file=/secrets/tls.key",
 		fmt.Sprintf("-base-address=https://%s", s.Spec.Route),
