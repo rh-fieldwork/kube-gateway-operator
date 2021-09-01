@@ -22,20 +22,17 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
-	oauthv1 "github.com/openshift/api/oauth/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
-	rbacv1 "k8s.io/api/rbac/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
-	ocgatev1beta1 "github.com/rh-fieldwork/kube-gateway-operator/api/v1beta1"
+	kubegatewayv1beta1 "github.com/kubevirt-ui/kube-gateway-operator/api/v1beta1"
 )
 
-const gateserverFinalizer = "ocgate.rh-fieldwork.com/finalizer"
+const gateserverFinalizer = "kubegateway.kubevirt.io/finalizer"
 
 // GateServerReconciler reconciles a GateServer object
 type GateServerReconciler struct {
@@ -57,12 +54,9 @@ type GateServerReconciler struct {
 // +kubebuilder:rbac:groups="route.openshift.io",resources=routes/custom-host,verbs=create;patch
 // +kubebuilder:rbac:groups="oauth.openshift.io",resources=oauthclients,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups="security.openshift.io",resources=securitycontextconstraints,resourceNames=privileged,verbs=use
-// +kubebuilder:rbac:groups="ocgate.rh-fieldwork.com",resources=gateservers,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups="ocgate.rh-fieldwork.com",resources=gateservers/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups="ocgate.rh-fieldwork.com",resources=gateservers/finalizers,verbs=update
-
-// In order to grant client users access to resource, the operator it'slef need this access.
-// Note: to create a new gate server with admin role, the role of this operator need to be adjusted.
+// +kubebuilder:rbac:groups="kubegateway.kubevirt.io",resources=gateservers,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups="kubegateway.kubevirt.io",resources=gateservers/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups="kubegateway.kubevirt.io",resources=gateservers/finalizers,verbs=update
 // +kubebuilder:rbac:groups="*",resources="*",verbs=get;list;watch
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
@@ -75,13 +69,14 @@ type GateServerReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.7.0/pkg/reconcile
 func (r *GateServerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	r.Log.Info("Reconcile", "gateserver", req.NamespacedName)
+	_ = r.Log.WithValues("gateserver", req.NamespacedName)
 
 	// your logic here
 
 	// Lookup the GateToken instance for this reconcile request
-	s := &ocgatev1beta1.GateServer{}
-	if err := r.Get(ctx, req.NamespacedName, s); err != nil {
+	gateserver := &kubegatewayv1beta1.GateServer{}
+	err := r.Get(ctx, req.NamespacedName, gateserver)
+	if err != nil {
 		if errors.IsNotFound(err) {
 			// Request object not found, could have been deleted after reconcile request.
 			// Owned objects are automatically garbage collected. For additional cleanup logic use finalizers.
@@ -96,20 +91,21 @@ func (r *GateServerReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 
 	// Check if the GateServer instance is marked to be deleted, which is
 	// indicated by the deletion timestamp being set.
-	isGateServerMarkedToBeDeleted := s.GetDeletionTimestamp() != nil
+	isGateServerMarkedToBeDeleted := gateserver.GetDeletionTimestamp() != nil
 	if isGateServerMarkedToBeDeleted {
-		if controllerutil.ContainsFinalizer(s, gateserverFinalizer) {
+		if controllerutil.ContainsFinalizer(gateserver, gateserverFinalizer) {
 			// Run finalization logic for gateserverFinalizer. If the
 			// finalization logic fails, don't remove the finalizer so
 			// that we can retry during the next reconciliation.
-			if err := r.finalizeGateServer(s); err != nil {
+			if err := r.finalizeGateServer(gateserver); err != nil {
 				return ctrl.Result{}, err
 			}
 
 			// Remove gateserverFinalizer. Once all finalizers have been
 			// removed, the object will be deleted.
-			controllerutil.RemoveFinalizer(s, gateserverFinalizer)
-			if err := r.Update(ctx, s); err != nil {
+			controllerutil.RemoveFinalizer(gateserver, gateserverFinalizer)
+			err := r.Update(ctx, gateserver)
+			if err != nil {
 				return ctrl.Result{}, err
 			}
 		}
@@ -117,127 +113,78 @@ func (r *GateServerReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	}
 
 	// If token was created, exit.
-	if s.Status.Phase != "" {
-		r.Log.Info("Old server", "id", s.Name)
+	if gateserver.Status.Phase != "" {
+		r.Log.Info("Old server", "id", gateserver.Name)
 		return ctrl.Result{}, nil
 	}
 
-	// Check role
-	var err error
-	if len(s.Spec.ServiceAccountNonResourceURLs) != 0 && len(s.Spec.ServiceAccountAPIGroups) != 0 {
-		err = fmt.Errorf("auth roles can either apply to API resources or non-resource URL paths, but not both")
-	}
-	if len(s.Spec.ServiceAccountNonResourceURLs) == 0 && len(s.Spec.ServiceAccountAPIGroups) == 0 {
-		err = fmt.Errorf("auth roles can either apply to API resources or non-resource URL paths, but can't be empty")
-	}
+	// Take time
+	t := metav1.Time{Time: time.Now()}
 
+	ctr, err := r.CreateResources(ctx, gateserver)
 	if err != nil {
-		r.Log.Info("Failed to create oc gate proxy.", "err", err)
-
-		setServerCondition(s, "FailedCreateServer", err)
-		if err := r.Status().Update(ctx, s); err != nil {
-			r.Log.Info("Failed to update status", "err", err)
-		}
-		return ctrl.Result{}, nil
+		return ctr, nil
 	}
 
-	// Create the server
-	if err := r.buildServer(ctx, s); err != nil {
-		r.Log.Info("Failed to create oc gate proxy.", "err", err)
+	// Create the gate service
+	dep, _ := r.Deployment(gateserver)
+	err = r.Client.Create(ctx, dep)
+	if err != nil {
+		r.Log.Info("Failed to create deployment.", "err", err)
 
-		setServerCondition(s, "FailedCreateServer", err)
-		if err := r.Status().Update(ctx, s); err != nil {
+		gateserver.Status.Phase = "Error"
+		condition := metav1.Condition{
+			Type:               "DeploymentCreated",
+			Status:             "False",
+			Reason:             "FailedCreateDeployment",
+			Message:            fmt.Sprintf("%s", err),
+			LastTransitionTime: t,
+		}
+		gateserver.Status.Conditions = append(gateserver.Status.Conditions, condition)
+		if err := r.Status().Update(ctx, gateserver); err != nil {
 			r.Log.Info("Failed to update status", "err", err)
 		}
+
 		return ctrl.Result{}, nil
 	}
 
 	// Add finalizer for this CR
-	if !controllerutil.ContainsFinalizer(s, gateserverFinalizer) {
-		controllerutil.AddFinalizer(s, gateserverFinalizer)
-		if err := r.Update(ctx, s); err != nil {
-			r.Log.Info("Failed to add finalizer", "err", err)
-			return ctrl.Result{}, nil
+	if !controllerutil.ContainsFinalizer(gateserver, gateserverFinalizer) {
+		controllerutil.AddFinalizer(gateserver, gateserverFinalizer)
+		err = r.Update(ctx, gateserver)
+		if err != nil {
+			return ctrl.Result{}, err
 		}
 	}
 
-	// Set status to Ready
-	now := metav1.Time{Time: time.Now()}
-	s.Status.Phase = "Ready"
+	gateserver.Status.Phase = "Ready"
 	condition := metav1.Condition{
 		Type:               "Created",
 		Status:             "True",
 		Reason:             "AllResourcesCreated",
 		Message:            "All resources created",
-		LastTransitionTime: now,
+		LastTransitionTime: t,
 	}
-	s.Status.Conditions = append(s.Status.Conditions, condition)
-	if err := r.Status().Update(ctx, s); err != nil {
+	gateserver.Status.Conditions = append(gateserver.Status.Conditions, condition)
+	if err := r.Status().Update(ctx, gateserver); err != nil {
 		r.Log.Info("Failed to update status", "err", err)
 	}
 
 	return ctrl.Result{}, nil
 }
 
-func (r *GateServerReconciler) finalizeGateServer(s *ocgatev1beta1.GateServer) error {
+func (r *GateServerReconciler) finalizeGateServer(m *kubegatewayv1beta1.GateServer) error {
 	// TODO(user): Add the cleanup steps that the operator
 	// needs to do before the CR can be deleted. Examples
 	// of finalizers include performing backups and deleting
 	// resources that are not owned by this CR, like a PVC.
-
-	ctx := context.Background()
-	opts := &client.DeleteOptions{}
-	errs := []error{}
-
-	r.Log.Info("Deleting cluster role and cluster role binding...")
-
-	clusterRole := &rbacv1.ClusterRole{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: s.Name,
-		},
-	}
-	if err := r.Delete(ctx, clusterRole, opts); err != nil {
-		r.Log.Info("Failed to finalize clusterRole", "err", err)
-		errs = append(errs, err)
-	}
-
-	if s.Spec.ServiceAccountNamespace == "*" {
-		clusterRoleBinding := &rbacv1.ClusterRoleBinding{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: s.Name,
-			},
-		}
-		if err := r.Delete(ctx, clusterRoleBinding, opts); err != nil {
-			r.Log.Info("Failed to finalize clusterRoleBinding", "err", err)
-			errs = append(errs, err)
-		}
-	}
-
-	if s.Spec.GenerateOauthClient {
-		r.Log.Info("Deleting oauthclient...")
-		oauthclient := &oauthv1.OAuthClient{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: s.Name,
-			},
-		}
-		if err := r.Delete(ctx, oauthclient, opts); err != nil {
-			r.Log.Info("Failed to finalize oauthclient", "err", err)
-			errs = append(errs, err)
-		}
-	}
-
-	if len(errs) != 0 {
-		r.Log.Info("Failed to finalized gateserver")
-	} else {
-		r.Log.Info("Successfully finalized gateserver")
-	}
-
+	r.Log.Info("Successfully finalized gateserver")
 	return nil
 }
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *GateServerReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&ocgatev1beta1.GateServer{}).
+		For(&kubegatewayv1beta1.GateServer{}).
 		Complete(r)
 }

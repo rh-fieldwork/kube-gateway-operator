@@ -1,0 +1,11 @@
+apiVersion: kubegateway.kubevirt.io/v1beta1
+kind: GateToken
+metadata:
+  name: gatetoken-sample
+  namespace: kube-gateway
+spec:
+  secret-name: gateserver-sample-jwt-secret
+  urls:
+  - /api/v1/*
+  - /apis/*
+

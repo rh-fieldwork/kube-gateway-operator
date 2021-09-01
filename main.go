@@ -31,11 +31,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	oauthv1 "github.com/openshift/api/oauth/v1"
 	routev1 "github.com/openshift/api/route/v1"
 
-	ocgatev1beta1 "github.com/rh-fieldwork/kube-gateway-operator/api/v1beta1"
-	"github.com/rh-fieldwork/kube-gateway-operator/controllers"
+	kubegatewayv1beta1 "github.com/kubevirt-ui/kube-gateway-operator/api/v1beta1"
+	"github.com/kubevirt-ui/kube-gateway-operator/controllers"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -48,9 +47,7 @@ func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 
 	utilruntime.Must(routev1.AddToScheme(scheme))
-	utilruntime.Must(oauthv1.AddToScheme(scheme))
-
-	utilruntime.Must(ocgatev1beta1.AddToScheme(scheme))
+	utilruntime.Must(kubegatewayv1beta1.AddToScheme(scheme))
 	// +kubebuilder:scaffold:scheme
 }
 
@@ -77,7 +74,7 @@ func main() {
 		Port:                   9443,
 		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         enableLeaderElection,
-		LeaderElectionID:       "cce4a833.rh-fieldwork.com",
+		LeaderElectionID:       "cce4a833.kubevirt.io",
 	})
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")
