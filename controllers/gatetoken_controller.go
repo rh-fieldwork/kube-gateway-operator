@@ -19,25 +19,21 @@ package controllers
 import (
 	"context"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/go-logr/logr"
+	"github.com/golang-jwt/jwt"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	corev1 "k8s.io/api/core/v1"
-	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	ocgatev1beta1 "github.com/rh-fieldwork/kube-gateway-operator/api/v1beta1"
-	"github.com/rh-fieldwork/kube-gateway-operator/pkg/token"
+	kubegatewayv1beta1 "github.com/kubevirt-ui/kube-gateway-operator/api/v1beta1"
 )
-
-const gatetokenFinalizer = "ocgate.rh-fieldwork.com/finalizer"
 
 // GateTokenReconciler reconciles a GateToken object
 type GateTokenReconciler struct {
@@ -48,12 +44,9 @@ type GateTokenReconciler struct {
 
 // +kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch
 // +kubebuilder:rbac:groups=security.openshift.io,resources=securitycontextconstraints,resourceNames=privileged,verbs=use
-// +kubebuilder:rbac:groups="",resources=serviceaccounts,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups="rbac.authorization.k8s.io",resources=clusterroles,verbs=get;list;watch;create;update;patch;delete;deletecollection
-// +kubebuilder:rbac:groups="rbac.authorization.k8s.io",resources=clusterrolebindings,verbs=get;list;watch;create;update;patch;delete;deletecollection
-// +kubebuilder:rbac:groups="ocgate.rh-fieldwork.com",resources=gatetokens,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups="ocgate.rh-fieldwork.com",resources=gatetokens/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups="ocgate.rh-fieldwork.com",resources=gatetokens/finalizers,verbs=update
+// +kubebuilder:rbac:groups=kubegateway.kubevirt.io,resources=gatetokens,verbs=get;list;watch;create;delete
+// +kubebuilder:rbac:groups=kubegateway.kubevirt.io,resources=gatetokens/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=kubegateway.kubevirt.io,resources=gatetokens/finalizers,verbs=update
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -65,13 +58,13 @@ type GateTokenReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.7.0/pkg/reconcile
 func (r *GateTokenReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	r.Log.Info("Reconcile", "gatetoken", req.NamespacedName)
+	_ = r.Log.WithValues("gatetoken", req.NamespacedName)
 
 	// your logic here
 
 	// Lookup the GateToken instance for this reconcile request
-	t := &ocgatev1beta1.GateToken{}
-	if err := r.Get(ctx, req.NamespacedName, t); err != nil {
+	token := &kubegatewayv1beta1.GateToken{}
+	if err := r.Get(ctx, req.NamespacedName, token); err != nil {
 		if errors.IsNotFound(err) {
 			// Request object not found, could have been deleted after reconcile request.
 			// Owned objects are automatically garbage collected. For additional cleanup logic use finalizers.
@@ -84,357 +77,168 @@ func (r *GateTokenReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		return ctrl.Result{}, err
 	}
 
-	// Check if the GateServer instance is marked to be deleted, which is
-	// indicated by the deletion timestamp being set.
-	isGateTokenMarkedToBeDeleted := t.GetDeletionTimestamp() != nil
-	if isGateTokenMarkedToBeDeleted {
-		if controllerutil.ContainsFinalizer(t, gatetokenFinalizer) {
-			// Run finalization logic for gatetokenFinalizer. If the
-			// finalization logic fails, don't remove the finalizer so
-			// that we can retry during the next reconciliation.
-			if err := r.finalizeGateToken(t); err != nil {
-				return ctrl.Result{}, err
-			}
-
-			// Remove gateserverFinalizer. Once all finalizers have been
-			// removed, the object will be deleted.
-			controllerutil.RemoveFinalizer(t, gateserverFinalizer)
-			if err := r.Update(ctx, t); err != nil {
-				return ctrl.Result{}, err
-			}
-		}
-		return ctrl.Result{}, nil
-	}
-
-	// If token in pending state, check nbf
-	if t.Status.Phase == "Pending" {
-		var errs []error
-		now := int64(time.Now().Unix())
-		exp := t.Status.Data.Exp
-		nbf := t.Status.Data.NBf
-
-		r.Log.Info("Pending phase token", "id", t.Name, "now", now, "nbf", nbf, "exp", exp)
-
-		if (nbf - now) > 0 {
-			r.Log.Info("Pending RequeueAfter", "sec", (nbf - now))
-			return ctrl.Result{
-				RequeueAfter: time.Duration(nbf-now) * time.Second,
-			}, nil
-		}
-
-		// If token is ready, create sideeffects
-		// and set phase to ready
-
-		if t.Spec.GenerateServiceAccount {
-			r.Log.Info("Create namespaced service account.")
-			serviceaccount, _ := token.ServiceAccount(t)
-			controllerutil.SetControllerReference(t, serviceaccount, r.Scheme)
-			if err := r.Client.Create(ctx, serviceaccount); err != nil {
-				r.Log.Info("Failed to create serviceaccount", "err", err)
-				errs = append(errs, err)
-			}
-
-			clusterrole, _ := token.ClusterRole(t)
-			controllerutil.SetControllerReference(t, clusterrole, r.Scheme)
-			if err := r.Client.Create(ctx, clusterrole); err != nil {
-				r.Log.Info("Failed to create role", "err", err)
-				errs = append(errs, err)
-			}
-
-			if t.Spec.Namespace == "*" {
-				clusterrolebinding, _ := token.ClusterRoleBinding(t)
-				controllerutil.SetControllerReference(t, clusterrolebinding, r.Scheme)
-				if err := r.Client.Create(ctx, clusterrolebinding); err != nil {
-					r.Log.Info("Failed to create clusterrolebinding", "err", err)
-					errs = append(errs, err)
-				}
-			} else {
-				rolebinding, _ := token.RoleBinding(t)
-				controllerutil.SetControllerReference(t, rolebinding, r.Scheme)
-				if err := r.Client.Create(ctx, rolebinding); err != nil {
-					r.Log.Info("Failed to create rolebinding", "err", err)
-					errs = append(errs, err)
-				}
-			}
-		}
-
-		if len(errs) != 0 {
-			setErrorCondition(t, "FailedSA", errs[0])
-			if err := r.Status().Update(ctx, t); err != nil {
-				r.Log.Info("Failed to update status", "err", err)
-			}
-
-			return ctrl.Result{}, nil
-		}
-
-		// If token is found, move to Ready
-		setReadyCondition(t, "Ready", "Token is ready")
-		if err := r.Status().Update(ctx, t); err != nil {
-			r.Log.Info("Failed to update status", "err", err)
-		}
-
-		// If using k8s to generate the token, reques and wait for token.
-		if t.Spec.GenerateServiceAccount {
-			return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
-		}
-	}
-
-	// If token in ready state and missing token, reque
-	if t.Status.Phase == "Ready" && t.Status.Token == "" && t.Spec.GenerateServiceAccount {
-		serviceaccount := &corev1.ServiceAccount{}
-		if err := r.Get(ctx, req.NamespacedName, serviceaccount); err != nil {
-			if errors.IsNotFound(err) {
-				// Request object not found, could have been deleted after reconcile request.
-				// Owned objects are automatically garbage collected. For additional cleanup logic use finalizers.
-				// Return and don't requeue
-				r.Log.Info("Service account resource not found. Ignoring since object must be deleted.")
-				return ctrl.Result{}, nil
-			}
-			// Error reading the object - requeue the request.
-			r.Log.Error(err, "Failed to get ServiceAccount.")
-			return ctrl.Result{}, err
-		}
-
-		secretPrefix := fmt.Sprintf("%s-token-", t.Name)
-		secretName := ""
-		for _, s := range serviceaccount.Secrets {
-			if strings.HasPrefix(s.Name, secretPrefix) {
-				secretName = s.Name
-			}
-		}
-
-		// Reque until token secret is available
-		r.Log.Info("Reading token", "secretName", secretName)
-		key, err := getSecret(ctx, r.Client, secretName, t.Namespace, "token")
-		if err != nil {
-			r.Log.Info("Can't read service account token", "err", err)
-
-			setErrorCondition(t, "TokenGetterError", err)
-			if err := r.Status().Update(ctx, t); err != nil {
-				r.Log.Info("Failed to update status", "err", err)
-			}
-
-			return ctrl.Result{}, nil
-		}
-
-		t.Status.Token = string(key)
-		if err := r.Status().Update(ctx, t); err != nil {
-			r.Log.Info("Failed to update status", "err", err)
-		}
-	}
-
-	// If token in ready state, check expiration
-	if t.Status.Phase == "Ready" {
-		now := int64(time.Now().Unix())
-		exp := t.Status.Data.Exp
-
-		r.Log.Info("Ready phase token", "id", t.Name, "now", now, "exp", exp)
-
-		if (exp - now) > 0 {
-			r.Log.Info("Ready RequeueAfter", "sec", (exp - now))
-			return ctrl.Result{
-				RequeueAfter: time.Duration(exp-now) * time.Second,
-			}, nil
-		}
-
-		// If token expired, delete sideeffects
-		// and set phase to completed
-
-		if t.Spec.GenerateServiceAccount {
-			r.Log.Info("Deleting service acount...")
-
-			opts := &client.DeleteOptions{}
-			errs := []error{}
-
-			serviceaccount := &corev1.ServiceAccount{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      t.Name,
-					Namespace: t.Namespace,
-				},
-			}
-			if err := r.Delete(ctx, serviceaccount, opts); err != nil {
-				r.Log.Info("Failed to delete service account", "err", err)
-				errs = append(errs, err)
-			}
-
-			clusterrole := &rbacv1.ClusterRole{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: t.Name,
-				},
-			}
-			if err := r.Delete(ctx, clusterrole, opts); err != nil {
-				r.Log.Info("Failed to delete role", "err", err)
-				errs = append(errs, err)
-			}
-
-			if t.Spec.Namespace == "*" {
-				clusterrolebinding := &rbacv1.ClusterRoleBinding{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: t.Name,
-					},
-				}
-				if err := r.Delete(ctx, clusterrolebinding, opts); err != nil {
-					r.Log.Info("Failed to delete clusterRoleBinding", "err", err)
-					errs = append(errs, err)
-				}
-			} else {
-				rolebinding := &rbacv1.RoleBinding{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      t.Name,
-						Namespace: t.Spec.Namespace,
-					},
-				}
-				if err := r.Delete(ctx, rolebinding, opts); err != nil {
-					r.Log.Info("Failed to delete roleBinding", "err", err)
-					errs = append(errs, err)
-				}
-			}
-
-			if len(errs) != 0 {
-				r.Log.Info("Failed to delete service account")
-			}
-		}
-
-		setCompletedCondition(t, "Expired", "Token expired")
-
-		if err := r.Status().Update(ctx, t); err != nil {
-			r.Log.Info("Failed to update status", "err", err)
-		}
-		return ctrl.Result{}, nil
-	}
-
 	// If token was created, exit.
-	if t.Status.Phase != "" {
-		r.Log.Info("Old token", "id", t.Name)
-		return ctrl.Result{}, nil
-	}
-
-	// Check role
-	var err error
-	if len(t.Spec.NonResourceURLs) != 0 && len(t.Spec.APIGroups) != 0 {
-		err = fmt.Errorf("auth roles can either apply to API resources or non-resource URL paths, but not both")
-	}
-	if len(t.Spec.NonResourceURLs) == 0 && len(t.Spec.APIGroups) == 0 {
-		err = fmt.Errorf("auth roles can either apply to API resources or non-resource URL paths, but can't be empty")
-	}
-
-	if err != nil {
-		r.Log.Info("Failed to create oc gate token.", "err", err)
-
-		setErrorCondition(t, "UserDataError", err)
-		if err := r.Status().Update(ctx, t); err != nil {
-			r.Log.Info("Failed to update status", "err", err)
-		}
+	if token.Status.Phase != "" {
+		r.Log.Info("Old token", "id", token.Name)
 		return ctrl.Result{}, nil
 	}
 
 	// Parse and cache user data.
-	if err := cacheData(t); err != nil {
+	if err := cacheData(token); err != nil {
 		r.Log.Info("Can't parse token data", "err", err)
 
-		setErrorCondition(t, "UserDataError", err)
-		if err := r.Status().Update(ctx, t); err != nil {
+		setErrorCondition(token, "UserDataError", err)
+
+		if err := r.Status().Update(ctx, token); err != nil {
 			r.Log.Info("Failed to update status", "err", err)
 		}
 		return ctrl.Result{}, nil
 	}
 
-	// Set gate-token access code
 	// Get private key secret
-	if !t.Spec.GenerateServiceAccount {
-		key, err := getSecret(ctx, r.Client, "kube-gateway-jwt-secret", t.Namespace, "key.pem")
-		if err != nil {
-			r.Log.Info("Can't read private key secret", "err", err)
+	key, err := getSecret(ctx, r.Client, token.Spec.SecretName, token.Spec.SecretNamespace, token.Spec.SecretFile)
+	if err != nil {
+		r.Log.Info("Can't read private key secret", "err", err)
 
-			setErrorCondition(t, "PrivateKeyError", err)
-			if err := r.Status().Update(ctx, t); err != nil {
-				r.Log.Info("Failed to update status", "err", err)
-			}
-			return ctrl.Result{}, nil
+		setErrorCondition(token, "PrivateKeyError", err)
+		if err := r.Status().Update(ctx, token); err != nil {
+			r.Log.Info("Failed to update status", "err", err)
 		}
 
-		// Create token
-		err = singToken(t, key)
-		if err != nil {
-			r.Log.Info("Can't read private key secret", "err", err)
-
-			setErrorCondition(t, "PrivateKeyError", err)
-			if err := r.Status().Update(ctx, t); err != nil {
-				r.Log.Info("Failed to update status", "err", err)
-			}
-
-			return ctrl.Result{}, nil
-		}
+		return ctrl.Result{}, nil
 	}
 
-	// Add finalizer for this CR
-	if !controllerutil.ContainsFinalizer(t, gatetokenFinalizer) {
-		controllerutil.AddFinalizer(t, gatetokenFinalizer)
-		if err := r.Update(ctx, t); err != nil {
-			r.Log.Info("Failed to add finalizer", "err", err)
-			return ctrl.Result{}, nil
+	// Create token
+	err = singToken(token, key)
+	if err != nil {
+		r.Log.Info("Can't read private key secret", "err", err)
+
+		setErrorCondition(token, "PrivateKeyError", err)
+		if err := r.Status().Update(ctx, token); err != nil {
+			r.Log.Info("Failed to update status", "err", err)
 		}
+
+		return ctrl.Result{}, nil
 	}
 
 	// Token is ready
-	setPendingCondition(t, "TokenPending", "Token pending")
-	if err := r.Status().Update(ctx, t); err != nil {
+	setReadyCondition(token, "TokenCreated", "token created")
+	if err := r.Status().Update(ctx, token); err != nil {
 		r.Log.Info("Failed to update status", "err", err)
 	}
 	return ctrl.Result{}, nil
 }
 
-func (r *GateTokenReconciler) finalizeGateToken(t *ocgatev1beta1.GateToken) error {
-	// TODO(user): Add the cleanup steps that the operator
-	// needs to do before the CR can be deleted. Examples
-	// of finalizers include performing backups and deleting
-	// resources that are not owned by this CR, like a PVC.
+// SetupWithManager sets up the controller with the Manager.
+func (r *GateTokenReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	return ctrl.NewControllerManagedBy(mgr).
+		For(&kubegatewayv1beta1.GateToken{}).
+		Complete(r)
+}
 
-	ctx := context.Background()
-	opts := &client.DeleteOptions{}
-	errs := []error{}
+// Cache user data
+func cacheData(token *kubegatewayv1beta1.GateToken) error {
+	var notBeforeTime int64
+	var duration time.Duration
 
-	if !t.Spec.GenerateServiceAccount {
-		r.Log.Info("Successfully finalized gatetoken (no ServiceAccount)")
-		return nil
-	}
-
-	r.Log.Info("Deleting cluster role and cluster role binding...")
-
-	clusterrole := &rbacv1.ClusterRole{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: t.Name,
-		},
-	}
-	if err := r.Delete(ctx, clusterrole, opts); err != nil {
-		r.Log.Info("Failed to finalize clusterRole", "err", err)
-		errs = append(errs, err)
-	}
-
-	if t.Spec.Namespace == "*" {
-		clusterrolebinding := &rbacv1.ClusterRoleBinding{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: t.Name,
-			},
-		}
-		if err := r.Delete(ctx, clusterrolebinding, opts); err != nil {
-			r.Log.Info("Failed to finalize clusterRoleBinding", "err", err)
-			errs = append(errs, err)
-		}
-	}
-
-	if len(errs) != 0 {
-		r.Log.Info("Failed to finalized gatetoken")
+	// Default from is "now"
+	if token.Spec.From == "" {
+		notBeforeTime = int64(time.Now().Unix())
 	} else {
-		r.Log.Info("Successfully finalized gatetoken (ServiceAccount)")
+		fromTime, err := time.Parse(time.RFC3339, token.Spec.From)
+		if err != nil {
+			return err
+		}
+		notBeforeTime = int64(fromTime.Unix())
 	}
+
+	// Default Verbs is ["get"]
+	if token.Spec.Verbs == nil {
+		token.Spec.Verbs = []string{"get"}
+	}
+
+	// Default DurationSec is 3600s (1h)
+	if token.Spec.Duration == "" {
+		token.Spec.Duration = "1h"
+	}
+
+	if token.Spec.SecretNamespace == "" {
+		token.Spec.SecretNamespace = token.Namespace
+	}
+
+	// Set gate token cache data
+	duration, _ = time.ParseDuration(token.Spec.Duration)
+	token.Status.Data.NBf = notBeforeTime
+	token.Status.Data.Exp = notBeforeTime + int64(duration.Seconds())
+	token.Status.Data.From = time.Unix(notBeforeTime, 0).UTC().Format(time.RFC3339)
+	token.Status.Data.Until = time.Unix(notBeforeTime+int64(duration.Seconds()), 0).UTC().Format(time.RFC3339)
+	token.Status.Data.Duration = token.Spec.Duration
+	token.Status.Data.Verbs = token.Spec.Verbs
+	token.Status.Data.URLs = token.Spec.URLs
 
 	return nil
 }
 
-// SetupWithManager sets up the controller with the Manager.
-func (r *GateTokenReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewControllerManagedBy(mgr).
-		For(&ocgatev1beta1.GateToken{}).
-		Complete(r)
+func getSecret(ctx context.Context, client client.Client, name string, namespace string, file string) ([]byte, error) {
+	// Get private key secret
+	secret := &corev1.Secret{}
+	namespaced := &types.NamespacedName{
+		Name:      name,
+		Namespace: namespace,
+	}
+
+	if err := client.Get(ctx, *namespaced, secret); err != nil {
+		return nil, err
+	}
+
+	key := secret.Data[file]
+	return key, nil
+}
+
+func setErrorCondition(token *kubegatewayv1beta1.GateToken, reason string, err error) {
+	t := metav1.Time{Time: time.Now()}
+	token.Status.Phase = "Error"
+	condition := metav1.Condition{
+		Type:               "Error",
+		Status:             "True",
+		Reason:             reason,
+		Message:            fmt.Sprintf("%s", err),
+		LastTransitionTime: t,
+	}
+	token.Status.Conditions = []metav1.Condition{condition}
+}
+
+func setReadyCondition(token *kubegatewayv1beta1.GateToken, reason string, message string) {
+	t := metav1.Time{Time: time.Now()}
+	token.Status.Phase = "Ready"
+	condition := metav1.Condition{
+		Type:               "Ready",
+		Status:             "True",
+		Reason:             reason,
+		Message:            message,
+		LastTransitionTime: t,
+	}
+	token.Status.Conditions = []metav1.Condition{condition}
+}
+
+func singToken(token *kubegatewayv1beta1.GateToken, key []byte) error {
+	// Create token
+	claims := &jwt.MapClaims{
+		"exp":   token.Status.Data.Exp,
+		"nbf":   token.Status.Data.NBf,
+		"URLs":  token.Status.Data.URLs,
+		"verbs": token.Status.Data.Verbs,
+	}
+	jwtToken := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
+	jwtKey, err := jwt.ParseRSAPrivateKeyFromPEM(key)
+	if err != nil {
+		return err
+	}
+	out, err := jwtToken.SignedString(jwtKey)
+	if err != nil {
+		return err
+	}
+
+	token.Status.Token = out
+	return nil
 }

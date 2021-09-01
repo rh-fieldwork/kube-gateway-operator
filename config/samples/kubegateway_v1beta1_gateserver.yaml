@@ -1,0 +1,7 @@
+apiVersion: kubegateway.kubevirt.io/v1beta1
+kind: GateServer
+metadata:
+  name: gateserver-sample
+  namespace: kube-gateway
+spec:
+  img: 'quay.io/kubevirt-ui/kube-gateway:latest'

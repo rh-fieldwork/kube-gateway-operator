@@ -1,95 +1,79 @@
-# kube-gateway-operator
-
-[![Go Report Card](https://goreportcard.com/badge/github.com/rh-fieldwork/kube-gateway-operator)](https://goreportcard.com/report/github.com/rh-fieldwork/kube-gateway-operator)
-[![Go Reference](https://pkg.go.dev/badge/github.com/rh-fieldwork/kube-gateway-operator.svg)](https://pkg.go.dev/github.com/rh-fieldwork/kube-gateway-operator)
+[![Go Report Card](https://goreportcard.com/badge/github.com/kubevirt-ui/kube-gateway-operator)](https://goreportcard.com/report/github.com/kubevirt-ui/kube-gateway-operator)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
-![alt gopher network](https://raw.githubusercontent.com/rh-fieldwork/kube-gateway/main/web/public/network-side.png)
+# kube-gateway-operator
 
-The kube-gateway-operator operates the [kube-gateway](https://github.com/rh-fieldwork/kube-gateway) service and access tokens on a cluster.
+![alt gopher network](https://raw.githubusercontent.com/kubevirt-ui/kube-gateway-operator/main/docs/network-side.png)
 
-The kube-gateway service allows non-k8s users access to a single k8s resource for a limited time.
-It uses signed, limited duration [JWT](https://jwt.io/) to grant non-k8s users access to the cluster via a proxy server.
+The kube-gateway-operator installs and operates the [kube-gateway](https://github.com/kubevirt-ui/kube-gateway) service, which allows access to the k8s API using time-limited access tokens and usage of one-time access tokens to access k8s resources.
 
-Once installed, the operator manages two custom resources:
+The operator manages service accounts, permissions, and secrets needed for the operation of the [kube-gateway](https://github.com/kubevirt-ui/kube-gateway) service and JWT token generation used for one-time k8s API access.
 
-- [GateServer](#example-gateserver-cr): launches the kube-gateway service that proxies k8s API calls to users outside the cluster
-- [GateToken](#example-gatetoken-cr): manages the creation of the signed tokens used to authenticate with the kube-gateway service
+## Build and push images
 
-## Deploy the operator
-
-``` bash
-# Deploy the gate operator
-kubectl create -f \
-    https://raw.githubusercontent.com/rh-fieldwork/kube-gateway-operator/main/deploy/kube-gateway-operator.yaml
+```bash
+export USERNAME=yaacov
+IMG=quay.io/$USERNAME/kube-gateway-operator:v0.0.1 make podman-build
+IMG=quay.io/$USERNAME/kube-gateway-operator:v0.0.1 make podman-push
 ```
 
-### Deploy a gate server
+## Deploy
 
-``` bash
-# Create a namespace to run the gate server
-kubectl create namespace kube-gateway
+For more information about deployment options see the [deploy](/docs/deploy.md) doc.
 
-# Download the kube-gateway-server example
-curl https://raw.githubusercontent.com/rh-fieldwork/kube-gateway-operator/main/deploy/virt-gateway-server.yaml \
-    -o kube-gateway-server.yaml
+```bash
+# Deploy the operator, RBAC roles, and CRDs
+export USERNAME=yaacov
+IMG=quay.io/$USERNAME/kube-gateway-operator:v0.0.1 make deploy
 
-# Customize and deploy the kube-gateway-server example
-vim kube-gateway-server.yaml
-kubectl create -f kube-gateway-server.yaml
+# Deploy from an example deployment yaml. Will use pre-defined images and permissions. 
+# Users can also copy this file to a local directory and edit the container image used.
+oc create -f https://raw.githubusercontent.com/kubevirt-ui/kube-gateway-operator/main/deploy/kube-gateway-operator.yaml
 ```
 
-## Example GateToken CR
-
-This example will generate a token that will give its holder access to API calls matching the path `/k8s/apis/subresources.kubevirt.io/v1alpha3/namespaces/default/virtualmachineinstances/testvm/vnc` for one hour. You can edit the route to match the route designated for the gate server on your cluster.
-
-```yaml
-apiVersion: ocgate.rh-fieldwork.com/v1beta1
-kind: GateToken
-metadata:
-  name: gatetoken-sample
-  namespace: kube-gateway
-spec:
-  namespace: "default"
-  resourceNames:
-    - testvm
+```bash
+# Remove deployment of the operator, RBAC roles, and CRDs
+export USERNAME=yaacov
+IMG=quay.io/$USERNAME/kube-gateway-operator:v0.0.1 make undeploy
 ```
 
-## Example GateServer CR
+![alt install operator](https://raw.githubusercontent.com/kubevirt-ui/kube-gateway-operator/main/docs/install-operator.gif)
 
-A single gate server can handle requests for resources from different users and across different namespaces.
+## Create GateServer and GateToken examples
 
-```yaml
-apiVersion: ocgate.rh-fieldwork.com/v1beta1
-kind: GateServer
-metadata:
-  name: gateserver-sample
-  namespace: kube-gateway
-spec:
-  route: kube-gateway-proxy.apps-crc.testing
-  # serviceAccount fields are used to create a service account for the oc gate proxy.
-  # The proxy will run using this service account. It will only be able to proxy
-  # requests that are available to this service account. Make sure to allow the 
-  # proxy to access all k8s resources that the web application will consume.
-  serviceAccountVerbs:
-    - "get"
-  serviceAccountAPIGroups:
-    - "subresources.kubevirt.io"
-  serviceAccountResources:
-    - "virtualmachineinstances"
-    - "virtualmachineinstances/vnc"
-  # generateSecret is used to automatically create a secret holding the asymmetrical
-  # keys needed to sign and authenticate the JWT tokens.
-  generateSecret: true
-  # passThrough is used to pass the request token directly to the k8s API server without
-  # authenticating and replaces it with the service account access token of the proxy
-  passThrough: false
-  # the proxy server container image
-  image: 'quay.io/rh-fieldwork/kube-gateway'
-  # webAppImage is used to customize the static files of your web app.
-  # This example will install the noVNC web application that consumes
-  # websockets streaming VNC data.
-  webAppImage: 'quay.io/rh-fieldwork/kube-gateway-web-app-novnc'
+For more information about running the gateway proxy and generating a token see the [token](/docs/token.md) and [deploy](/docs/deploy.md#starting-a-gateway) docs.
+
+```bash
+# Use the kube-gateway namespace
+oc create namespace kube-gateway
+
+# Create a sample gateway server
+oc create -f config/samples/kubegateway_v1beta1_gateserver.yaml
+
+# Create a sample token request
+oc create -f config/samples/kubegateway_v1beta1_gatetoken.yaml
+
+# Check the token
+oc get gatetoken gatetoken-sample -o yaml
+```
+Example files:
+[gateserver.yaml](/config/samples/kubegateway_v1beta1_gateserver.yaml),
+[gatetoken.yaml](/config/samples/kubegateway_v1beta1_gatetoken.yaml)
+
+![alt create signed link](https://raw.githubusercontent.com/kubevirt-ui/kube-gateway-operator/main/docs/create-signed-link.gif)
+
+## Building for local development
+
+```bash
+# Compile the operator
+make
+
+# Install CRDs on the cluster for running locally
+make install
+# make uninstall
+
+# Run locally
+make run
 ```
 
-Credit: gopher network image created by Egon Elbre and can be found at [egonelbre/gophers](https://github.com/egonelbre/gophers)
+(gopher network image - [egonelbre/gophers](https://github.com/egonelbre/gophers))

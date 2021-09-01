@@ -63,6 +63,56 @@ rules:
   - update
   - watch
 - apiGroups:
+  - kubegateway.kubevirt.io
+  resources:
+  - gateservers
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - kubegateway.kubevirt.io
+  resources:
+  - gateservers/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - kubegateway.kubevirt.io
+  resources:
+  - gateservers/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - kubegateway.kubevirt.io
+  resources:
+  - gatetokens
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - watch
+- apiGroups:
+  - kubegateway.kubevirt.io
+  resources:
+  - gatetokens/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - kubegateway.kubevirt.io
+  resources:
+  - gatetokens/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
   - networking.k8s.io
   resources:
   - ingresses
@@ -86,58 +136,6 @@ rules:
   - patch
   - update
   - watch
-- apiGroups:
-  - ocgate.rh-fieldwork.com
-  resources:
-  - gateservers
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - ocgate.rh-fieldwork.com
-  resources:
-  - gateservers/finalizers
-  verbs:
-  - update
-- apiGroups:
-  - ocgate.rh-fieldwork.com
-  resources:
-  - gateservers/status
-  verbs:
-  - get
-  - patch
-  - update
-- apiGroups:
-  - ocgate.rh-fieldwork.com
-  resources:
-  - gatetokens
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - ocgate.rh-fieldwork.com
-  resources:
-  - gatetokens/finalizers
-  verbs:
-  - update
-- apiGroups:
-  - ocgate.rh-fieldwork.com
-  resources:
-  - gatetokens/status
-  verbs:
-  - get
-  - patch
-  - update
 - apiGroups:
   - rbac.authorization.k8s.io
   resources:

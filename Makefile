@@ -1,5 +1,3 @@
-SHELL = /bin/bash
-
 # VERSION defines the project version for the bundle. 
 # Update this value when you upgrade the version of your project.
 # To re-generate a bundle for another specific version without changing the standard setup, you can:
@@ -28,10 +26,10 @@ BUNDLE_METADATA_OPTS ?= $(BUNDLE_CHANNELS) $(BUNDLE_DEFAULT_CHANNEL)
 
 # BUNDLE_IMG defines the image:tag used for the bundle. 
 # You can use it as an arg. (E.g make bundle-build BUNDLE_IMG=<some-registry>/<project-name-bundle>:<tag>)
-BUNDLE_IMG ?= quay.io/rh-fieldwork/kube-gateway-operator-bundle
+BUNDLE_IMG ?= quay.io/kubevirt-ui/kube-gateway-operator-bundle:v0.0.1
 
 # Image URL to use all building/pushing image targets
-IMG ?= quay.io/rh-fieldwork/kube-gateway-operator
+IMG ?= quay.io/kubevirt-ui/kube-gateway-operator:v0.0.1
 # Produce CRDs that work back to Kubernetes 1.11 (no version conversion)
 CRD_OPTIONS ?= "crd:trivialVersions=true,preserveUnknownFields=false"
 
@@ -47,7 +45,7 @@ all: manager
 # Run tests
 ENVTEST_ASSETS_DIR=$(shell pwd)/testbin
 test: generate fmt vet manifests
-	mkdir -p ${ENVTEST_ASSETS_DIR}
+	-mkdir -p ${ENVTEST_ASSETS_DIR}
 	test -f ${ENVTEST_ASSETS_DIR}/setup-envtest.sh || curl -sSLo ${ENVTEST_ASSETS_DIR}/setup-envtest.sh https://raw.githubusercontent.com/kubernetes-sigs/controller-runtime/v0.7.0/hack/setup-envtest.sh
 	source ${ENVTEST_ASSETS_DIR}/setup-envtest.sh; fetch_envtest_tools $(ENVTEST_ASSETS_DIR); setup_envtest_env $(ENVTEST_ASSETS_DIR); go test ./... -coverprofile cover.out
 
@@ -67,24 +65,21 @@ install: manifests kustomize
 uninstall: manifests kustomize
 	$(KUSTOMIZE) build config/crd | kubectl delete -f -
 
-# Create the deploy dir
-ENV_DEPLOY_DIR=$(shell pwd)/deploy
-deploy-dir: manifests kustomize
-	mkdir -p ${ENV_DEPLOY_DIR}
-	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
-	$(KUSTOMIZE) build config/default > ${ENV_DEPLOY_DIR}/kube-gateway-operator.yaml
-
 # Deploy controller in the configured Kubernetes cluster in ~/.kube/config
-deploy: manifests kustomize deploy-dir
-	kubectl apply -f ${ENV_DEPLOY_DIR}/virt-gateway-namespace.yaml
-	kubectl apply -f ${ENV_DEPLOY_DIR}/kube-gateway-operator.yaml
-	kubectl apply -f ${ENV_DEPLOY_DIR}/virt-gateway-server.yaml
+DEPLOY_DIR=$(shell pwd)/deploy
+deploy: deploy-dir
+	kubectl apply -f ${DEPLOY_DIR}/kube-gateway-operator.yaml
+
+# Create the deployment file
+DEPLOY_DIR=$(shell pwd)/deploy
+deploy-dir: manifests kustomize
+	-mkdir ${DEPLOY_DIR}
+	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
+	$(KUSTOMIZE) build config/default > ${DEPLOY_DIR}/kube-gateway-operator.yaml
 
 # UnDeploy controller from the configured Kubernetes cluster in ~/.kube/config
 undeploy:
-	-kubectl delete -f ${ENV_DEPLOY_DIR}/virt-gateway-server.yaml
-	-kubectl delete -f ${ENV_DEPLOY_DIR}/kube-gateway-operator.yaml
-	-kubectl delete -f ${ENV_DEPLOY_DIR}/virt-gateway-namespace.yaml
+	$(KUSTOMIZE) build config/default | kubectl delete -f -
 
 # Generate manifests e.g. CRD, RBAC etc.
 manifests: controller-gen
